@@ -34,8 +34,14 @@ app.listen(port, () => {
     console.log('Server up and running on port: ' + port)
 })
 
-const pet = {
-    name: 'Hal'
-}
+const main = async () => {
+    // const task = await Task.findById('5fcef9cc94cfc81b10a95271')
+    // await task.populate('owner').execPopulate()
+    // console.log(task.owner)
 
-console.log(JSON.stringify(pet))
+    const user = await User.findById('5fcef7b9acae930ac4c9357a')
+    await user.populate('tasks').execPopulate()
+    console.log(user)
+} 
+
+main()

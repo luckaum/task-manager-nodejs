@@ -1,10 +1,16 @@
 const express = require('express')
 const Task = require('../models/task')
+const auth = require('../middleware/auth')
 const router = new express.Router()
 const validator = require('validator')
+const { ObjectId } = require('mongodb')
 
-router.post('/tasks', async (req, res) => {
-    const task = new Task(req.body)
+router.post('/tasks', auth, async (req, res) => {
+    //const task = new Task(req.body)
+    const task = new Task({
+        ...req.body,
+        owner: req.user._id
+    })
 
     try{
         await task.save()
@@ -14,21 +20,22 @@ router.post('/tasks', async (req, res) => {
     }
 })
 
-router.get('/tasks', async (req, res) => {
+router.get('/tasks', auth, async (req, res) => {
     try{
-        const tasks = await Task.find({})
-        res.send(tasks)
+        await req.user.populate('tasks').execPopulate()
+        res.send(req.user.tasks)
     }catch (e) {
         res.status(500).send(e)
     }
 })
 
-router.get('/tasks/:id', async (req, res) => {
+router.get('/tasks/:id', auth, async (req, res) => {
     const _id = req.params.id
 
     if ( validator.isMongoId(_id) ) {
         try{
-            const task = await Task.findById(_id)
+            //const task = await Task.findById(_id)
+            const task = await Task.findOne({_id, owner: req.user._id})
             if (!task) {
                 return res.status(404).send()
             }
@@ -41,7 +48,7 @@ router.get('/tasks/:id', async (req, res) => {
     }
 })
 
-router.patch('/tasks/:id', async (req, res) => {
+router.patch('/tasks/:id', auth, async (req, res) => {
     const _id = req.params.id
     const updates = Object.keys(req.body)
     const allowedUpdates = ['description', 'completed']
@@ -54,16 +61,16 @@ router.patch('/tasks/:id', async (req, res) => {
    
     if ( validator.isMongoId(_id) ) {    
         try{
-           const task = await Task.findById(_id)
-
-           updates.forEach((update) => task[update] = req.body[updates])
-
-           await task.save()
+        
+            const task = await Task.findOne({_id, owner: req.user._id})
            
             // const task = await Task.findByIdAndUpdate(_id, req.body, { new: true, runValidators: true})
             if (!task) {
                 return res.status(404).send()
             }
+
+            updates.forEach((update) => task[update] = req.body[updates])
+            await task.save()
             res.send(task)
 
         }catch (e) {
@@ -74,11 +81,11 @@ router.patch('/tasks/:id', async (req, res) => {
     }
 })
 
-router.delete('/tasks/:id', async (req, res) => {
+router.delete('/tasks/:id', auth, async (req, res) => {
     const _id = req.params.id
     if ( validator.isMongoId(_id) ) {
         try {
-            const task = await Task.findByIdAndDelete(_id)
+            const task = await Task.findOneAndDelete({_id, owner: req.user._id})
             if (!task) {
                 return res.status(404).send()
             }
